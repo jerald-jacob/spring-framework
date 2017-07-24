@@ -32,8 +32,9 @@ public interface WebExceptionHandler {
 	 * exception is still not handled.
 	 * @param exchange the current exchange
 	 * @param ex the exception to handle
+	 * @param handler the original {@code WebHandler} that threw the exception
 	 * @return {@code Mono<Void>} to indicate when exception handling is complete
 	 */
-	Mono<Void> handle(ServerWebExchange exchange, Throwable ex);
+	Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler);
 
 }

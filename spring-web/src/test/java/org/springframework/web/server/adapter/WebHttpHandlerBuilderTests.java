@@ -141,13 +141,13 @@ public class WebHttpHandlerBuilderTests {
 		@Bean
 		@Order(2)
 		public WebExceptionHandler exceptionHandlerA() {
-			return (exchange, ex) -> writeToResponse(exchange, "ExceptionHandlerA");
+			return (exchange, ex, handler) -> writeToResponse(exchange, "ExceptionHandlerA");
 		}
 
 		@Bean
 		@Order(1)
 		public WebExceptionHandler exceptionHandlerB() {
-			return (exchange, ex) -> writeToResponse(exchange, "ExceptionHandlerB");
+			return (exchange, ex, handler) -> writeToResponse(exchange, "ExceptionHandlerB");
 		}
 
 		@Bean

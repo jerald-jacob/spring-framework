@@ -84,12 +84,20 @@ public class ExceptionHandlingWebHandlerTests {
 		assertEquals(HttpStatus.BAD_REQUEST, this.exchange.getResponse().getStatusCode());
 	}
 
+	@Test
+	public void errorDispatchedBackToWebHandler() throws Exception {
+		createWebHandler(new ErrorPageExceptionHandler()).handle(this.exchange).block();
+		assertEquals(HttpStatus.SERVICE_UNAVAILABLE, this.exchange.getResponse().getStatusCode());
+	}
+
 	private WebHandler createWebHandler(WebExceptionHandler... handlers) {
 		return new ExceptionHandlingWebHandler(this.targetHandler, Arrays.asList(handlers));
 	}
 
 
 	private static class StubWebHandler implements WebHandler {
+
+		private final static String ERROR_PATH = "/error";
 
 		private final RuntimeException exception;
 
@@ -107,17 +115,23 @@ public class ExceptionHandlingWebHandlerTests {
 
 		@Override
 		public Mono<Void> handle(ServerWebExchange exchange) {
-			if (this.raise) {
-				throw this.exception;
+			if(ERROR_PATH.equals(exchange.getRequest().getPath().value())) {
+				exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
+				return exchange.getResponse().setComplete();
 			}
-			return Mono.error(this.exception);
+			else {
+				if (this.raise) {
+					throw this.exception;
+				}
+				return Mono.error(this.exception);
+			}
 		}
 	}
 
 	private static class BadRequestExceptionHandler implements WebExceptionHandler {
 
 		@Override
-		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler) {
 			exchange.getResponse().setStatusCode(HttpStatus.BAD_REQUEST);
 			return Mono.empty();
 		}
@@ -127,8 +141,17 @@ public class ExceptionHandlingWebHandlerTests {
 	private static class UnresolvedExceptionHandler implements WebExceptionHandler {
 
 		@Override
-		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler) {
 			return Mono.error(ex);
+		}
+	}
+
+	private static class ErrorPageExceptionHandler implements WebExceptionHandler {
+
+		@Override
+		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler) {
+			ServerWebExchange mutated = exchange.mutate().request(req -> req.path("/error").build()).build();
+			return handler.handle(mutated);
 		}
 	}
 

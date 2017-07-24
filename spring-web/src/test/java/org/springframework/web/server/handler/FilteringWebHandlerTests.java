@@ -189,7 +189,7 @@ public class FilteringWebHandlerTests {
 		private Throwable ex;
 
 		@Override
-		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler) {
 			this.ex = ex;
 			return Mono.error(ex);
 		}

@@ -224,7 +224,7 @@ public class DispatcherHandlerErrorTests {
 	private static class ServerError500ExceptionHandler implements WebExceptionHandler {
 
 		@Override
-		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+		public Mono<Void> handle(ServerWebExchange exchange, Throwable ex, WebHandler handler) {
 			exchange.getResponse().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
 			return Mono.empty();
 		}
