@@ -15,6 +15,7 @@ plugins {
 	id "com.gradle.build-scan" version "1.8"
 	id "io.spring.dependency-management" version "1.0.3.RELEASE" apply false
 	id "org.jetbrains.kotlin.jvm" version "1.1.4" apply false
+	id 'com.github.johnrengelman.shadow' version '2.0.1' apply false
 	id "org.asciidoctor.convert" version "1.5.3"
 	id "org.sonarqube" version "2.5"
 }
@@ -32,9 +33,9 @@ ext {
 	linkScmConnection = 'scm:git:git://github.com/spring-projects/spring-framework.git'
 	linkScmDevConnection = 'scm:git:ssh://git@github.com:spring-projects/spring-framework.git'
 
-	moduleProjects = subprojects.findAll {
-		!it.name.equals('spring-build-src') && !it.name.equals('spring-framework-bom')
-	}
+	supportProjects = [project('spring-build-src'), project('spring-core-libs'),
+					   project('spring-framework-bom')]
+	moduleProjects = subprojects - supportProjects
 }
 
 configure(allprojects) { project ->
@@ -260,109 +261,12 @@ configure(subprojects - project(":spring-build-src")) { subproject ->
 	}
 }
 
-project("spring-core") {
-	description = "Spring Core"
-
-	// As of Spring 4.0.3, spring-core includes asm 5.x and repackages cglib 3.2, inlining
-	// both into the spring-core jar. cglib 3.2 itself depends on asm 5.x and is therefore
-	// further transformed by the JarJar task to depend on org.springframework.asm; this
-	// avoids including two different copies of asm unnecessarily.
-	def cglibVersion = "3.2.5"
-	def objenesisVersion = "2.6"
-
-	configurations {
-		jarjar
-		cglib
-		objenesis
-	}
-
-	task cglibRepackJar(type: Jar) { repackJar ->
-		repackJar.baseName = "spring-cglib-repack"
-		repackJar.version = cglibVersion
-
-		doLast() {
-			project.ant {
-				taskdef name: "jarjar", classname: "com.tonicsystems.jarjar.JarJarTask",
-					classpath: configurations.jarjar.asPath
-				jarjar(destfile: repackJar.archivePath) {
-					configurations.cglib.each { originalJar ->
-						zipfileset(src: originalJar)
-					}
-					// Repackage net.sf.cglib => org.springframework.cglib
-					rule(pattern: "net.sf.cglib.**", result: "org.springframework.cglib.@1")
-					// As mentioned above, transform cglib"s internal asm dependencies from
-					// org.objectweb.asm => org.springframework.asm. Doing this counts on the
-					// the fact that Spring and cglib depend on the same version of asm!
-					rule(pattern: "org.objectweb.asm.**", result: "org.springframework.asm.@1")
-				}
-			}
-		}
-	}
-
-	task objenesisRepackJar(type: Jar) { repackJar ->
-		repackJar.baseName = "spring-objenesis-repack"
-		repackJar.version = objenesisVersion
-
-		doLast() {
-			project.ant {
-				taskdef name: "jarjar", classname: "com.tonicsystems.jarjar.JarJarTask",
-					classpath: configurations.jarjar.asPath
-				jarjar(destfile: repackJar.archivePath) {
-					configurations.objenesis.each { originalJar ->
-						zipfileset(src: originalJar)
-					}
-					// Repackage org.objenesis => org.springframework.objenesis
-					rule(pattern: "org.objenesis.**", result: "org.springframework.objenesis.@1")
-				}
-			}
-		}
-	}
-
-	dependencies {
-		cglib("cglib:cglib:${cglibVersion}@jar")
-		objenesis("org.objenesis:objenesis:${objenesisVersion}@jar")
-		jarjar("com.googlecode.jarjar:jarjar:1.3")
-
-		compile(files(cglibRepackJar))
-		compile(files(objenesisRepackJar))
-		compile(project(":spring-jcl"))
-		optional("net.sf.jopt-simple:jopt-simple:5.0.3")
-		optional("org.aspectj:aspectjweaver:${aspectjVersion}")
-		optional("org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}")
-		optional("org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}")
-		optional("io.projectreactor:reactor-core")
-		optional("io.reactivex:rxjava:${rxjavaVersion}")
-		optional("io.reactivex:rxjava-reactive-streams:${rxjavaAdapterVersion}")
-		optional("io.reactivex.rxjava2:rxjava:${rxjava2Version}")
-		optional("io.netty:netty-buffer")
-		testCompile("io.projectreactor:reactor-test")
-		testCompile("javax.xml.bind:jaxb-api:${jaxbVersion}")
-		testCompile("org.apache.tomcat.embed:tomcat-embed-core:${tomcatVersion}")
-		testCompile("com.fasterxml.woodstox:woodstox-core:5.0.3") {
-			exclude group: "stax", module: "stax-api"
-		}
-	}
-
-	jar {
-		// Inline repackaged cglib classes directly into spring-core jar
-		dependsOn cglibRepackJar
-		from(zipTree(cglibRepackJar.archivePath)) {
-			include "org/springframework/cglib/**"
-		}
-
-		dependsOn objenesisRepackJar
-		from(zipTree(objenesisRepackJar.archivePath)) {
-			include "org/springframework/objenesis/**"
-		}
-	}
-}
-
 project("spring-beans") {
 	description = "Spring Beans"
 
 	dependencies {
-		compile(project(":spring-core"))
-		compile(files(project(":spring-core").cglibRepackJar))
+		compile project(':spring-jcl')
+		compile project(path: ':spring-core', configuration: 'shadow')
 		optional("javax.inject:javax.inject:1")
 		optional("org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}")
 		optional("org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}")
@@ -378,7 +282,7 @@ project("spring-beans-groovy") {
 	apply plugin: "groovy"
 
 	dependencies {
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional("org.codehaus.groovy:groovy-all:${groovyVersion}")
 	}
 
@@ -403,9 +307,7 @@ project("spring-aop") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
-		compile(files(project(":spring-core").cglibRepackJar))
-		compile(files(project(":spring-core").objenesisRepackJar))
+		compile(project(path: ':spring-core', configuration: 'shadow'))
 		optional("org.aspectj:aspectjweaver:${aspectjVersion}")
 		optional("org.apache.commons:commons-pool2:2.4.2")
 		optional("com.jamonapi:jamon:2.81")
@@ -416,7 +318,8 @@ project("spring-expression") {
 	description = "Spring Expression Language (SpEL)"
 
 	dependencies {
-		compile(project(":spring-core"))
+		compile(project(":spring-jcl"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 	}
 }
 
@@ -443,8 +346,7 @@ project("spring-context") {
 		compile(project(":spring-aop"))
 		compile(project(":spring-beans"))
 		compile(project(":spring-expression"))
-		compile(project(":spring-core"))
-		compile(files(project(":spring-core").cglibRepackJar))
+		compile project(path: ':spring-core', configuration: 'shadow')
 		optional(project(":spring-instrument"))
 		optional("javax.inject:javax.inject:1")
 		optional("javax.annotation:javax.annotation-api:1.3")
@@ -476,7 +378,7 @@ project("spring-oxm") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional("javax.xml.bind:jaxb-api:${jaxbVersion}")
 		optional("javax.activation:activation:${activationVersion}")
 		optional("org.codehaus.castor:castor-xml:1.4.1")  {
@@ -507,7 +409,7 @@ project("spring-messaging") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional(project(":spring-context"))
 		optional(project(":spring-oxm"))
 		optional("io.projectreactor.ipc:reactor-netty")
@@ -544,7 +446,7 @@ project("spring-tx") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional(project(":spring-aop"))
 		optional(project(":spring-context"))  // for JCA, @EnableTransactionManagement
 		optional("javax.ejb:javax.ejb-api:3.2")
@@ -564,7 +466,7 @@ project("spring-jms") {
 	dependencies {
 		provided("javax.jms:javax.jms-api:2.0.1")
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		compile(project(":spring-messaging"))
 		compile(project(":spring-tx"))
 		optional(project(":spring-aop"))
@@ -581,7 +483,7 @@ project("spring-jdbc") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		compile(project(":spring-tx"))
 		optional(project(":spring-context"))  // for JndiDataSourceLookup
 		optional("javax.transaction:javax.transaction-api:1.2")
@@ -611,7 +513,7 @@ project("spring-context-support") {
 	dependencies {
 		compile(project(":spring-beans"))
 		compile(project(":spring-context"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional(project(":spring-jdbc"))  // for Quartz support
 		optional(project(":spring-tx"))  // for Quartz support
 		optional("javax.activation:activation:${activationVersion}")
@@ -641,7 +543,7 @@ project("spring-web") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional(project(":spring-aop"))
 		optional(project(":spring-context"))
 		optional(project(":spring-oxm"))
@@ -722,7 +624,7 @@ project("spring-orm") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		compile(project(":spring-jdbc"))
 		compile(project(":spring-tx"))
 		optional(project(":spring-aop"))
@@ -745,8 +647,7 @@ project("spring-webmvc") {
 		compile(project(":spring-aop"))
 		compile(project(":spring-beans"))
 		compile(project(":spring-context"))
-		compile(project(":spring-core"))
-		compile(files(project(":spring-core").objenesisRepackJar))
+		compile project(path: ':spring-core', configuration: 'shadow')
 		compile(project(":spring-expression"))
 		compile(project(":spring-web"))
 		optional(project(":spring-context-support"))  // for FreeMarker support
@@ -830,7 +731,7 @@ project("spring-websocket") {
 
 	dependencies {
 		compile(project(":spring-context"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		compile(project(":spring-web"))
 		optional(project(":spring-messaging"))
 		optional(project(":spring-webmvc"))
@@ -868,7 +769,7 @@ project("spring-webflux") {
 
 	dependencies {
 		compile(project(":spring-beans"))
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		compile(project(":spring-web"))
 		compile("io.projectreactor:reactor-core")
 		optional(project(":spring-context"))
@@ -929,7 +830,7 @@ project("spring-test") {
 	description = "Spring TestContext Framework"
 
 	dependencies {
-		compile(project(":spring-core"))
+		compile(project(path: ":spring-core", configuration: "shadow"))
 		optional(project(":spring-aop"))
 		optional(project(":spring-beans"))
 		optional(project(":spring-context"))
@@ -1058,7 +959,7 @@ project("spring-aspects") {
 		optional(project(":spring-tx"))  // for JPA, @Transactional support
 		optional("javax.cache:cache-api:1.0.0") // for JCache aspect
 		optional("javax.transaction:javax.transaction-api:1.2")  // for @javax.transaction.Transactional support
-		testCompile(project(":spring-core"))  // for CodeStyleAspect
+		testCompile(project(path: ":spring-core", configuration: "shadow"))  // for CodeStyleAspect
 		testCompile(project(":spring-test"))
 		testCompile("javax.mail:javax.mail-api:${javamailVersion}")
 	}
@@ -1156,7 +1057,7 @@ configure(rootProject) {
 		testCompile(project(":spring-aop"))
 		testCompile(project(":spring-beans"))
 		testCompile(project(":spring-context"))
-		testCompile(project(":spring-core"))
+		testCompile(project(path: ":spring-core", configuration: "shadow"))
 		testCompile(project(":spring-expression"))
 		testCompile(project(":spring-jdbc"))
 		testCompile(project(":spring-orm"))
@@ -1198,15 +1099,6 @@ configure(rootProject) {
 configure([project(':spring-build-src'), project(':spring-framework-bom')]) {
 	sonarqube {
 		skipProject = true
-	}
-}
-
-configure(project(':spring-core')) {
-	sonarqube {
-		properties {
-			property "sonar.exclusions",
-					"src/main/java/org/springframework/cglib/**/*,src/main/java/org/springframework/asm/**/*"
-		}
 	}
 }
 

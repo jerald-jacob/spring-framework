@@ -1,0 +1,36 @@
+description = "Repackaging cglib+objenesis libraries"
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+// As of Spring 4.0.3, spring-core includes asm 5.x and repackages cglib 3.2, inlining
+// both into the spring-core jar. cglib 3.2 itself depends on asm 5.x and is therefore
+// further transformed by the JarJar task to depend on org.springframework.asm; this
+// avoids including two different copies of asm unnecessarily.
+def cglibVersion = "3.2.5"
+def objenesisVersion = "2.6"
+
+dependencies {
+  compile("cglib:cglib:${cglibVersion}")
+  compile("org.objenesis:objenesis:${objenesisVersion}")
+}
+
+// repackage objenesis, cglib and asm; relocate them to org.springframework packages
+shadowJar {
+  dependencies {
+    // TODO: better way to exclude transitive dependencies?
+    exclude(dependency('org.apache.logging.log4j:log4j-api:.*'))
+    exclude(dependency('org.apache.ant:ant:.*'))
+    exclude(dependency('org.apache.ant:ant-launcher:.*'))
+    exclude(dependency('org.slf4j:slf4j-api:.*'))
+  }
+  relocate 'org.objenesis', 'org.springframework.objenesis'
+  relocate 'net.sf.cglib', 'org.springframework.cglib'
+  relocate 'org.objectweb.asm', 'org.springframework.asm'
+}
+
+sonarqube {
+  properties {
+    property "sonar.exclusions",
+        "src/main/java/org/springframework/cglib/**/*,src/main/java/org/springframework/asm/**/*"
+  }
+}
