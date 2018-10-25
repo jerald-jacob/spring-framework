@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import org.springframework.web.reactive.resource.CssLinkResourceTransformer;
 import org.springframework.web.reactive.resource.PathResourceResolver;
 import org.springframework.web.reactive.resource.ResourceResolver;
 import org.springframework.web.reactive.resource.ResourceTransformer;
+import org.springframework.web.reactive.resource.ResourceTransformerSupport;
+import org.springframework.web.reactive.resource.ResourceUrlProvider;
 import org.springframework.web.reactive.resource.VersionResourceResolver;
 import org.springframework.web.reactive.resource.WebJarsResourceResolver;
 
@@ -50,6 +52,9 @@ public class ResourceChainRegistration {
 	private final List<ResourceResolver> resolvers = new ArrayList<>(4);
 
 	private final List<ResourceTransformer> transformers = new ArrayList<>(4);
+
+	@Nullable
+	private ResourceUrlProvider resourceUrlProvider;
 
 	private boolean hasVersionResolver;
 
@@ -72,6 +77,14 @@ public class ResourceChainRegistration {
 		}
 	}
 
+	/**
+	 * Configure the {@link ResourceUrlProvider} that can be used by
+	 * {@link org.springframework.web.reactive.resource.ResourceTransformer} instances.
+	 * @param resourceUrlProvider the resource URL provider to use
+	 */
+	public void setResourceUrlProvider(@Nullable ResourceUrlProvider resourceUrlProvider) {
+		this.resourceUrlProvider = resourceUrlProvider;
+	}
 
 	/**
 	 * Add a resource resolver to the chain.
@@ -104,6 +117,9 @@ public class ResourceChainRegistration {
 		if (transformer instanceof CssLinkResourceTransformer) {
 			this.hasCssLinkTransformer = true;
 		}
+		if (transformer instanceof ResourceTransformerSupport) {
+			((ResourceTransformerSupport) transformer).setResourceUrlProvider(this.resourceUrlProvider);
+		}
 		return this;
 	}
 
@@ -124,7 +140,9 @@ public class ResourceChainRegistration {
 			List<ResourceTransformer> result = new ArrayList<>(this.transformers);
 			boolean hasTransformers = !this.transformers.isEmpty();
 			boolean hasCaching = hasTransformers && this.transformers.get(0) instanceof CachingResourceTransformer;
-			result.add(hasCaching ? 1 : 0, new CssLinkResourceTransformer());
+			CssLinkResourceTransformer cssLinkResourceTransformer = new CssLinkResourceTransformer();
+			cssLinkResourceTransformer.setResourceUrlProvider(this.resourceUrlProvider);
+			result.add(hasCaching ? 1 : 0, cssLinkResourceTransformer);
 			return result;
 		}
 		return this.transformers;

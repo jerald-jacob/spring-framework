@@ -28,6 +28,7 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.lang.Nullable;
 import org.springframework.web.reactive.handler.AbstractUrlHandlerMapping;
 import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
+import org.springframework.web.reactive.resource.ResourceUrlProvider;
 import org.springframework.web.reactive.resource.ResourceWebHandler;
 import org.springframework.web.server.WebHandler;
 
@@ -59,6 +60,9 @@ public class ResourceHandlerRegistry {
 
 	private int order = Ordered.LOWEST_PRECEDENCE -1;
 
+	@Nullable
+	private ResourceUrlProvider resourceUrlProvider;
+
 
 	/**
 	 * Create a new resource handler registry for the given resource loader
@@ -69,6 +73,14 @@ public class ResourceHandlerRegistry {
 		this.resourceLoader = resourceLoader;
 	}
 
+	/**
+	 * Configure the {@link ResourceUrlProvider} that can be used by
+	 * {@link org.springframework.web.reactive.resource.ResourceTransformer} instances.
+	 * @param resourceUrlProvider the resource URL provider to use
+	 */
+	public void setResourceUrlProvider(@Nullable ResourceUrlProvider resourceUrlProvider) {
+		this.resourceUrlProvider = resourceUrlProvider;
+	}
 
 	/**
 	 * Add a resource handler for serving static resources based on the specified
@@ -82,6 +94,7 @@ public class ResourceHandlerRegistry {
 	 */
 	public ResourceHandlerRegistration addResourceHandler(String... patterns) {
 		ResourceHandlerRegistration registration = new ResourceHandlerRegistration(this.resourceLoader, patterns);
+		registration.setResourceUrlProvider(this.resourceUrlProvider);
 		this.registrations.add(registration);
 		return registration;
 	}

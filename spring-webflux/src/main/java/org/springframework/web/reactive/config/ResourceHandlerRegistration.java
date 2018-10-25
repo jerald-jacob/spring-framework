@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.CacheControl;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+import org.springframework.web.reactive.resource.ResourceUrlProvider;
 import org.springframework.web.reactive.resource.ResourceWebHandler;
 
 /**
@@ -48,6 +49,9 @@ public class ResourceHandlerRegistration {
 	@Nullable
 	private ResourceChainRegistration resourceChainRegistration;
 
+	@Nullable
+	private ResourceUrlProvider resourceUrlProvider;
+
 
 	/**
 	 * Create a {@link ResourceHandlerRegistration} instance.
@@ -62,6 +66,14 @@ public class ResourceHandlerRegistration {
 		this.pathPatterns = pathPatterns;
 	}
 
+	/**
+	 * Configure the {@link ResourceUrlProvider} that can be used by
+	 * {@link org.springframework.web.reactive.resource.ResourceTransformer} instances.
+	 * @param resourceUrlProvider the resource URL provider to use
+	 */
+	public void setResourceUrlProvider(@Nullable ResourceUrlProvider resourceUrlProvider) {
+		this.resourceUrlProvider = resourceUrlProvider;
+	}
 
 	/**
 	 * Add one or more resource locations from which to serve static content.
@@ -108,6 +120,7 @@ public class ResourceHandlerRegistration {
 	 */
 	public ResourceChainRegistration resourceChain(boolean cacheResources) {
 		this.resourceChainRegistration = new ResourceChainRegistration(cacheResources);
+		this.resourceChainRegistration.setResourceUrlProvider(this.resourceUrlProvider);
 		return this.resourceChainRegistration;
 	}
 
@@ -129,6 +142,7 @@ public class ResourceHandlerRegistration {
 	 */
 	public ResourceChainRegistration resourceChain(boolean cacheResources, Cache cache) {
 		this.resourceChainRegistration = new ResourceChainRegistration(cacheResources, cache);
+		this.resourceChainRegistration.setResourceUrlProvider(this.resourceUrlProvider);
 		return this.resourceChainRegistration;
 	}
 
