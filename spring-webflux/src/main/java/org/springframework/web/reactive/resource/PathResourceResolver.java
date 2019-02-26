@@ -110,7 +110,7 @@ public class PathResourceResolver extends AbstractResourceResolver {
 		try {
 			Resource resource = location.createRelative(resourcePath);
 			if (resource.isReadable()) {
-				if (checkResource(resource, location)) {
+				if (!isInvalidEncodedPath(resourcePath) && checkResource(resource, location)) {
 					return Mono.just(resource);
 				}
 				else if (logger.isWarnEnabled()) {
@@ -185,7 +185,7 @@ public class PathResourceResolver extends AbstractResourceResolver {
 			return true;
 		}
 		locationPath = (locationPath.endsWith("/") || locationPath.isEmpty() ? locationPath : locationPath + "/");
-		return (resourcePath.startsWith(locationPath) && !isInvalidEncodedPath(resourcePath));
+		return resourcePath.startsWith(locationPath);
 	}
 
 	private boolean isInvalidEncodedPath(String resourcePath) {

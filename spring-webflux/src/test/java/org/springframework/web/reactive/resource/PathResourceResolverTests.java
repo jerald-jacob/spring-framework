@@ -24,6 +24,9 @@ import org.junit.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.mock.http.server.reactive.test.MockServerHttpRequest;
+import org.springframework.mock.web.test.server.MockServerWebExchange;
+import org.springframework.web.reactive.function.server.MockServerRequest;
 
 import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertEquals;
@@ -104,6 +107,16 @@ public class PathResourceResolverTests {
 				singletonList(location), null).block(TIMEOUT);
 
 		assertEquals("../testalternatepath/bar.css", actual);
+	}
+
+	@Test
+	public void checkResourceWithRelativeLocation() throws Exception {
+		MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
+		Resource classPathLocation = new ClassPathResource("testalternatepath/../test/", PathResourceResolver.class);
+		UrlResource allowedLocation = new UrlResource(classPathLocation.getURL());
+		this.resolver.setAllowedLocations(allowedLocation);
+		List<Resource> locations = singletonList(allowedLocation);
+		assertNotNull(this.resolver.resolveResource(exchange, "js/lib@version.js", locations, null).block(TIMEOUT));
 	}
 
 	@Test // SPR-12624

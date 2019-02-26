@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import org.springframework.core.io.ClassPathResource;
@@ -43,6 +44,10 @@ public class PathResourceResolverTests {
 
 	private final PathResourceResolver resolver = new PathResourceResolver();
 
+	@Before
+	public void setup() {
+		this.resolver.setUrlPathHelper(new UrlPathHelper());
+	}
 
 	@Test
 	public void resolveFromClasspath() throws IOException {
@@ -101,6 +106,17 @@ public class PathResourceResolverTests {
 		List<Resource> locations = Collections.singletonList(location);
 		String actual = this.resolver.resolveUrlPath("../testalternatepath/bar.css", locations, null);
 		assertEquals("../testalternatepath/bar.css", actual);
+	}
+
+	@Test
+	public void checkResourceWithRelativeLocation() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		Resource classPathLocation = new ClassPathResource("testalternatepath/../test/", PathResourceResolver.class);
+		UrlResource allowedLocation = new UrlResource(classPathLocation.getURL());
+		this.resolver.setAllowedLocations(allowedLocation);
+		List<Resource> locations = Collections.singletonList(allowedLocation);
+		Resource actual = this.resolver.resolveResource(request, "js/lib@version.js", locations, null);
+		assertNotNull(actual);
 	}
 
 	// SPR-12432
