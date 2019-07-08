@@ -30,8 +30,8 @@ import reactor.core.publisher.Mono;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.lang.Nullable;
-import org.springframework.messaging.rsocket.annotation.support.RSocketMessageHandler;
 import org.springframework.util.MimeType;
+import org.springframework.util.RouteMatcher;
 
 /**
  * A thin wrapper around a sending {@link RSocket} with a fluent API accepting
@@ -64,7 +64,6 @@ public interface RSocketRequester {
 	 * server side it's obtained from the {@link ConnectionSetupPayload}.
 	 */
 	MimeType metadataMimeType();
-
 
 	/**
 	 * Begin to specify a new request with the given route to a remote handler.
@@ -158,8 +157,18 @@ public interface RSocketRequester {
 		/**
 		 * Set the {@link RSocketStrategies} to use for access to encoders,
 		 * decoders, and a factory for {@code DataBuffer's}.
+		 * @param strategies the codecs strategies to use
 		 */
 		RSocketRequester.Builder rsocketStrategies(@Nullable RSocketStrategies strategies);
+
+		/**
+		 * Set the {@link RouteMatcher} to use for matching incoming requests.
+		 * <p>If none is set, then the responder will use a default
+		 * {@link org.springframework.util.SimpleRouteMatcher} instance backed
+		 * by and {@link org.springframework.util.AntPathMatcher}.
+		 * @param routeMatcher the route matcher to use with the responder
+		 */
+		RSocketRequester.Builder routeMatcher(@Nullable RouteMatcher routeMatcher);
 
 		/**
 		 * Customize the {@link RSocketStrategies}.
@@ -171,15 +180,13 @@ public interface RSocketRequester {
 		RSocketRequester.Builder rsocketStrategies(Consumer<RSocketStrategies.Builder> configurer);
 
 		/**
-		 * Add handlers for processing requests sent by the server.
-		 * <p>This is a shortcut for registering client handlers (i.e. annotated controllers)
-		 * to a {@link RSocketMessageHandler} and configuring it as an acceptor.
-		 * You can take full control by manually registering an acceptor on the
-		 * {@link io.rsocket.RSocketFactory.ClientRSocketFactory} using
-		 * {@link #rsocketFactory(Consumer)} instead.
-		 * @param handlers the client handlers to configure on the requester
+		 * Configure a client responder for processing requests sent by the server.
+		 * <p>This is a shortcut for registering an acceptor on the
+		 * {@link io.rsocket.RSocketFactory.ClientRSocketFactory}
+		 * using {@link #rsocketFactory(Consumer)} instead.
+		 * @param responder the responder to use for processing requests sent by the server
 		 */
-		RSocketRequester.Builder annotatedHandlers(Object... handlers);
+		RSocketRequester.Builder responder(ClientResponder responder);
 
 		/**
 		 * Connect to the RSocket server over TCP.

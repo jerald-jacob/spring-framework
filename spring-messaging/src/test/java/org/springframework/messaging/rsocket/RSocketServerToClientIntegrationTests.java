@@ -104,7 +104,7 @@ public class RSocketServerToClientIntegrationTests {
 		RSocketRequester requester = null;
 		try {
 			requester = RSocketRequester.builder()
-					.annotatedHandlers(new ClientHandler())
+					.responder(RSocketMessageHandler.clientResponder(new ClientHandler()))
 					.rsocketStrategies(context.getBean(RSocketStrategies.class))
 					.connectTcp("localhost", server.address().getPort())
 					.block();

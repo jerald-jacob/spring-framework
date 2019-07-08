@@ -34,6 +34,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.handler.annotation.reactive.MessageMappingMessageHandler;
 import org.springframework.messaging.handler.invocation.reactive.HandlerMethodReturnValueHandler;
+import org.springframework.messaging.rsocket.ClientResponder;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.messaging.rsocket.RSocketStrategies;
 import org.springframework.util.Assert;
@@ -52,6 +53,7 @@ import org.springframework.util.StringUtils;
  * side adapters.
  *
  * @author Rossen Stoyanchev
+ * @author Brian Clozel
  * @since 5.2
  */
 public class RSocketMessageHandler extends MessageMappingMessageHandler {
@@ -230,6 +232,14 @@ public class RSocketMessageHandler extends MessageMappingMessageHandler {
 	 */
 	public BiFunction<ConnectionSetupPayload, RSocket, RSocket> clientAcceptor() {
 		return this::createRSocket;
+	}
+
+	/**
+	 * Configure a {@link ClientResponder} for handling requests sent by the server.
+	 * @param handlers the annotated handlers to configure
+	 */
+	public static ClientResponder clientResponder(Object... handlers) {
+		return new DefaultClientResponder(handlers);
 	}
 
 	private MessagingRSocket createRSocket(ConnectionSetupPayload setupPayload, RSocket rsocket) {
